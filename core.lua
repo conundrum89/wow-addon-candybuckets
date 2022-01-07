@@ -3,6 +3,7 @@ if WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
 end
 
 local addonName, ns = ...
+local addonVersion = (GetAddOnMetadata(addonName, "Version") or "0.0.0.0"):match("^([%d.]+)")
 
 --
 -- Debug
@@ -11,6 +12,14 @@ local addonName, ns = ...
 local DEBUG_MODULE = false
 local DEBUG_FACTION = false
 local DEBUG_LOCATION = false
+
+--
+-- Config
+--
+
+if (CandyBuckets_PlayerConfig == nil) then
+	CandyBuckets_PlayerConfig = {}
+end
 
 --
 -- Session
@@ -599,7 +608,9 @@ function addon:CheckCalendar()
 			local ongoing = event.sequenceType == "ONGOING" -- or event.sequenceType == "INFO"
 			local moduleName = MODULE_FROM_TEXTURE[event.iconTexture]
 
-			if event.sequenceType == "START" then
+			if (moduleName ~= nil and CandyBuckets_PlayerConfig["force_"..moduleName]) then
+				ongoing = true
+			elseif event.sequenceType == "START" then
 				ongoing = curHour >= event.startTime.hour and (curHour > event.startTime.hour or curMinute >= event.startTime.minute)
 			elseif event.sequenceType == "END" then
 				ongoing = curHour <= event.endTime.hour and (curHour < event.endTime.hour or curMinute <= event.endTime.minute)
@@ -622,6 +633,17 @@ function addon:CheckCalendar()
 			if moduleName and ongoing then
 				loadedEvents[moduleName] = true
 			end
+		end
+	end
+
+	for name, module in pairs(ns.modules) do
+		if (CandyBuckets_PlayerConfig["force_"..name]) then
+			if (addon:CanLoadModule(name)) then
+				DEFAULT_CHAT_FRAME:AddMessage("|cffFFFFFF" .. addonName .. "|r has force loaded the module for |cffFFFFFF" .. name .. "|r!", 1, 1, 0)
+				addon:LoadModule(name)
+				numLoadedRightNow = numLoadedRightNow + 1
+			end
+			loadedEvents[name] = true
 		end
 	end
 
@@ -883,5 +905,49 @@ function addon:QUEST_TURNED_IN(event, questID)
 
 	if addon:RemoveQuestPois(questID) then
 		addon:RefreshAllWorldMaps(true)
+	end
+end
+
+_G["SLASH_"..addonName.."1"] = "/"..addonName
+_G["SLASH_"..addonName.."2"] = "/cb"
+_G.SlashCmdList[addonName] = function (params)
+	local usageMsg = addonName.." "..addonVersion.." Commands:\n"
+		.."  /cb hello - Say Hello.\n"
+
+	if (params == nil or params == "") then
+		print(usageMsg)
+		return
+	end
+
+	params = string.lower(params)
+	local splitParams = {}
+	local paramCount = 0
+	for i in string.gmatch(params, "%S+") do
+		splitParams[paramCount] = i
+		paramCount = paramCount + 1
+	end
+
+	if (splitParams[0] == "help" or splitParams[0] == "?") then
+		print(usageMsg)
+	elseif (splitParams[0] == "force") then
+		if (splitParams[1] == nil) then
+			print(addonName..": Which event would you like to force enable?")
+			for name, module in pairs(ns.modules) do
+				print(name)
+			end
+		else
+			local moduleName = splitParams[1]
+			local module = ns.modules[moduleName]
+			if (module == nil) then
+				print(addonName..": Invalid module name ("..moduleName..").")
+			else
+				local toggle = true
+				if (CandyBuckets_PlayerConfig["force_"..moduleName]) then toggle = false end
+				CandyBuckets_PlayerConfig["force_"..moduleName] = toggle
+				addon:CheckCalendar()
+			end
+		end
+	else
+		print(addonName..": Invalid slash command ("..params..").")
 	end
 end

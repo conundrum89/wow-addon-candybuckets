@@ -5,6 +5,7 @@
 ## Version: 9.0.1.201029
 ## X-Curse-Project-ID: 44213
 ## X-WoWI-ID: 20450
+## SavedVariablesPerCharacter: CandyBuckets_PlayerConfig
 db\hallow.lua
 db\lunar.lua
 db\midsummer.lua
